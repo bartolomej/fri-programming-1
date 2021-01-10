@@ -69,7 +69,6 @@ class Oseba:
         self.preveri_zadetke()
         self.hitrost.angle += radians(uniform(-20, 20))
         self.pozicija += self.hitrost
-        pobrisi()
         krog(self.pozicija.x, self.pozicija.y, r=self.radius)
 
     def preveri_zadetke(self):
@@ -120,16 +119,6 @@ def main():
             nijz.porocaj()
         risar.cakaj(0.02)
         # TODO: popravit je treba flickering pri prisanju
-        # pobrisi()
-
-def custom_tests():
-    from itertools import count
-    osebe = [Oseba() for _ in range(100)]
-
-    for cas in count():
-        for oseba in osebe:
-            oseba.premik()
-        risar.cakaj(0.02)
         pobrisi()
 
 if __name__ == '__main__':
