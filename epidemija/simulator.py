@@ -3,7 +3,10 @@
 from random import uniform
 from math import *
 from risar import *
+from uuid import uuid4
+from functools import reduce
 
+# velikost kanvas okna
 w_size = (800, 500)
 
 
@@ -67,15 +70,17 @@ class Oseba:
 
     def __init__(self):
         w, h = w_size
+        self.id = uuid4()
         self.okuzena = False
+        self.ozdravljena = False
         self.radius = 5
         self.hitrost = Vector(angle=uniform(0, 2 * pi), mag=uniform(0, 5))
         self.pozicija = Vector(uniform(0, w), uniform(0, h))
         self.krog = krog(self.pozicija.x, self.pozicija.y, self.radius)
-        self.st_korakov_do_ozdravljenja = 150
-        self.korak_zdravljenja = self.st_korakov_do_ozdravljenja
-        self.st_korakov_v_izolaciji = 101
-        self.korak_izolacije = self.st_korakov_v_izolaciji
+        self.vsi_koraki_zdravljenja = 150
+        self.korak_zdravljenja = self.vsi_koraki_zdravljenja
+        self.vsi_koraki_izolacije = 100
+        self.korak_izolacije = self.vsi_koraki_izolacije
 
     def premik(self, osebe):
         if self.je_izolirana():
@@ -83,9 +88,9 @@ class Oseba:
                 if abs(o.pozicija - self.pozicija) <= 20:
                     o.hitrost.angle += radians(180)
         if self.korak_izolacije == 0:
-            self.korak_izolacije = self.st_korakov_v_izolaciji
+            self.korak_izolacije = self.vsi_koraki_izolacije
             zapolni(self.krog, risar.crna)
-        elif self.korak_izolacije < self.st_korakov_v_izolaciji:
+        elif self.korak_izolacije < self.vsi_koraki_izolacije:
             self.korak_izolacije -= 1
             risar.zapolni(self.krog, risar.rumena)
             return
@@ -95,8 +100,7 @@ class Oseba:
         self.narisi()
 
     def narisi(self):
-        spremeni_barvo(self.krog,
-                       risar.zelena if 0 == self.korak_zdravljenja else risar.rdeca if self.okuzena else risar.bela)
+        spremeni_barvo(self.krog, risar.zelena if self.ozdravljena else risar.rdeca if self.okuzena else risar.bela)
         premakni_na(self.krog, self.pozicija.x, self.pozicija.y)
 
     def preveri_zadetke(self):
@@ -112,9 +116,15 @@ class Oseba:
     def okuzi_se(self):
         # ozdravljene so tiste osebe, ki jim je ostalo 0 korakov zdravljenja
         # zdravijo se tiste osebe, ki imajo stevilo korakov zdravljenja med 0 in 150
-        if not self.korak_zdravljenja == 0 or self.korak_zdravljenja == self.st_korakov_do_ozdravljenja:
+        if self.korak_zdravljenja == self.vsi_koraki_zdravljenja and not self.okuzena:
             self.okuzena = True
-            nijz.sporoci_okuzbo()
+            nijz.sporoci_okuzbo(self.id)
+
+    def ozdravi_se(self):
+        if not self.ozdravljena:
+            self.ozdravljena = True
+            self.okuzena = False
+            nijz.sporoci_ozdravitev(self.id)
 
     def se_dotikata(self, oseba):
         return abs(self.pozicija - oseba.pozicija) <= self.radius + oseba.radius
@@ -127,9 +137,8 @@ class Oseba:
     def zdravi_se(self):
         if self.okuzena and self.korak_zdravljenja > 0:
             self.korak_zdravljenja -= 1
-        elif self.korak_zdravljenja == 0:
-            self.okuzena = False
-            nijz.sporoci_ozdravitev()
+        if self.korak_zdravljenja == 0 and self.okuzena:
+            self.ozdravi_se()
 
     def vrni_krog(self):
         return self.krog
@@ -138,38 +147,40 @@ class Oseba:
         self.korak_izolacije -= 1
 
     def je_izolirana(self):
-        return self.korak_izolacije < self.st_korakov_v_izolaciji
+        return self.korak_izolacije < self.vsi_koraki_izolacije
 
 
 class NIJZ:
     def __init__(self):
-        self.okuzbe = [0, 0]
         self.ozdravitve = [0, 0]
+        self.okuzbe = {}
         self.graf_okuzb = []
         self.graf_ozdravitev = []
+        self.prev_okuzbe = 0
+        self.count = 0
 
-    def sporoci_okuzbo(self):
-        self.okuzbe[-1] += 1
+    def sporoci_okuzbo(self, oseba_id):
+        self.okuzbe[oseba_id] = True
 
-    def sporoci_ozdravitev(self):
+    def sporoci_ozdravitev(self, oseba_id):
+        self.okuzbe[oseba_id] = False
         self.ozdravitve[-1] += 1
 
     def porocaj(self):
         w, h = w_size
-        x_scale = 8
-        y_scale = lambda y: y if y == 0 else log(y) * 20
-        oky0, oky1 = list(map(y_scale, self.okuzbe[-2:]))
-        ozy0, ozy1 = list(map(y_scale, self.ozdravitve[-2:]))
-        x0, x1 = ((len(self.okuzbe) - 1) * x_scale, len(self.okuzbe) * x_scale)
-        # narisi graf okuzb in ozdravitev
+        curr_okuzbe = reduce(lambda p, c: p + (1 if c[1] else 0), self.okuzbe.items(), 0)
+        oky0, oky1 = (self.prev_okuzbe, curr_okuzbe)
+        ozy0, ozy1 = (sum(self.ozdravitve[:-1]), sum(self.ozdravitve))
+        x0, x1 = list(map(lambda x: x * 5, ((self.count - 1), self.count)))
         self.graf_okuzb.append(risar.crta(x0, h - oky0, x1, h - oky1, barva=risar.rdeca))
         self.graf_ozdravitev.append(risar.crta(x0, h - ozy0, x1, h - ozy1, barva=risar.zelena))
-        self.okuzbe.append(0)
         self.ozdravitve.append(0)
+        self.prev_okuzbe = curr_okuzbe
+        self.count += 1
 
 
 nijz = NIJZ()
-stevilo_oseb = 150
+stevilo_oseb = 100
 
 # Vse od tod naprej pustite pri miru
 
