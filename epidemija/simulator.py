@@ -10,6 +10,8 @@ from functools import reduce
 w_size = (800, 500)
 
 
+# ta razred sem napisal malo za zabavo,
+# malo pa zato da si olajsam delo z vektorskimi racuni v razredu oseba
 class Vector:
     def __init__(self, x=1.0, y=1.0, angle=None, mag=1.0):
         # moznost inicializacije tudi z smerjo in magnitudo
@@ -70,6 +72,7 @@ class Oseba:
 
     def __init__(self):
         w, h = w_size
+        # spodnji id bomo potrebovali za belezenje okuzb
         self.id = uuid4()
         self.okuzena = False
         self.ozdravljena = False
@@ -83,23 +86,32 @@ class Oseba:
         self.korak_izolacije = self.vsi_koraki_izolacije
 
     def premik(self, osebe):
+        # ce je oseba izolirana poskrbimo, da se vse bliznje osebe oddalijo od te osebe
         if self.je_izolirana():
             for o in osebe:
                 if abs(o.pozicija - self.pozicija) <= 20:
                     o.hitrost.angle += radians(180)
+        # ce je dozen 0-ti korak izoliranosti,
+        # spremenljivko korak_izolacije spet nastavimo na zacetno vrednost
+        # in s tem povemo, da oseba ni vec v izolaciji
         if self.korak_izolacije == 0:
             self.korak_izolacije = self.vsi_koraki_izolacije
             zapolni(self.krog, risar.crna)
-        elif self.korak_izolacije < self.vsi_koraki_izolacije:
+        # ce je oseba v izolaciji in korak izolacije ni 0, zmanjsamo stevec korakov izolacije
+        # ter osebo zapolnemo z rumeno barvo
+        elif self.je_izolirana():
             self.korak_izolacije -= 1
             risar.zapolni(self.krog, risar.rumena)
             return
         self.preveri_zadetke()
+        # v vsaki 'casovni enoti' pristejemo nakljucno vrednost kota vektorju hitrosti
         self.hitrost.angle += radians(uniform(-20, 20))
+        # vektorju pozicije pristejemo vektor trenutne hitrosti, da osebo premaknemo na novo mesto
         self.pozicija += self.hitrost
         self.narisi()
 
     def narisi(self):
+        # tukaj poskrbimo za risanje osebe na kanvas
         spremeni_barvo(self.krog, risar.zelena if self.ozdravljena else risar.rdeca if self.okuzena else risar.bela)
         premakni_na(self.krog, self.pozicija.x, self.pozicija.y)
 
@@ -147,6 +159,8 @@ class Oseba:
         self.korak_izolacije -= 1
 
     def je_izolirana(self):
+        # oseba je izolirana v primeru da se zmanjsuje njen korak_izolacije
+        # (mora biti manjsi od zacetne vrednosti)
         return self.korak_izolacije < self.vsi_koraki_izolacije
 
 
@@ -169,8 +183,10 @@ class NIJZ:
     def porocaj(self):
         w, h = w_size
         curr_okuzbe = reduce(lambda p, c: p + (1 if c[1] else 0), self.okuzbe.items(), 0)
+        # izberemo zadnji dve y tocki za oba grafa, ki bosta sluzili kot krajisci nove daljice grafa
         oky0, oky1 = (self.prev_okuzbe, curr_okuzbe)
         ozy0, ozy1 = (sum(self.ozdravitve[:-1]), sum(self.ozdravitve))
+        # po x osi graf se raztegnemo za x * 5
         x0, x1 = list(map(lambda x: x * 5, ((self.count - 1), self.count)))
         self.graf_okuzb.append(risar.crta(x0, h - oky0, x1, h - oky1, barva=risar.rdeca))
         self.graf_ozdravitev.append(risar.crta(x0, h - ozy0, x1, h - ozy1, barva=risar.zelena))
